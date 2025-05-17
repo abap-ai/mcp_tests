@@ -1,0 +1,26 @@
+[
+  {
+    "client": "001",
+    "area": "test",
+    "server": "test_full",
+    "class": "ZCL_MCP_TEST_FULL"
+  },
+  {
+    "client": "001",
+    "area": "test",
+    "server": "test_icf_session",
+    "class": "ZCL_MCP_TEST_ICF_SESSION"
+  },
+  {
+    "client": "001",
+    "area": "test",
+    "server": "test_mcp_session",
+    "class": "ZCL_MCP_TEST_MCP_SESSION"
+  },
+  {
+    "client": "001",
+    "area": "test",
+    "server": "test_minimal",
+    "class": "ZCL_MCP_TEST_MINIMAL"
+  }
+]
