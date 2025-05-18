@@ -84,7 +84,7 @@ describe('MCP Server Tools Tests', () => {
                 TextInput: "x".repeat(101),
                 TestInputArray: [{ Line: 1, Text: "Test" }]
             }
-        })).rejects.toThrow("Input parameter 'TextInput' is too long");
+        })).rejects.toThrow("String must have maximum length 100, but has 101");
     });
 
     test('Should fail when calling non-existent tool', async () => {

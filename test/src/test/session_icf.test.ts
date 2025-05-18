@@ -65,7 +65,7 @@ describe('ICF Server Session Tests', () => {
         await expect(client.callTool({
             name: "Test ICF Session",
             arguments: {}
-        })).rejects.toThrow("Increment value is required.");
+        })).rejects.toThrow("Required property \"increment\" is missing");
     });
 
     test('Different client should start with fresh session', async () => {
