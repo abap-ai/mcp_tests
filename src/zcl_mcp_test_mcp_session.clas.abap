@@ -13,6 +13,9 @@ CLASS zcl_mcp_test_mcp_session DEFINITION
     METHODS: get_session_mode REDEFINITION.
 
   PRIVATE SECTION.
+    METHODS get_increment_schema
+      RETURNING VALUE(result) TYPE REF TO zcl_mcp_schema_builder
+      RAISING   zcx_mcp_ajson_error.
 ENDCLASS.
 
 
@@ -26,12 +29,13 @@ CLASS zcl_mcp_test_mcp_session IMPLEMENTATION.
 
   METHOD handle_list_tools.
     TRY.
+        " TODO: variable is assigned but never used (ABAP cleaner)
         DATA(schema) = NEW zcl_mcp_schema_builder( )->add_integer( name        = `increment`
                                                                    description = `Increment the given number`
                                                                    required    = abap_true ) ##NO_TEXT.
-        response-result->set_tools(
-            VALUE #(
-                ( name = `Test MCP Session` description = `Using MCP sessions we increment by the given number` input_schema = schema->to_json( ) ) ) ) ##NO_TEXT.
+        response-result->set_tools( VALUE #( ( name         = `Test MCP Session`
+                                               description  = `Using MCP sessions we increment by the given number`
+                                               input_schema = get_increment_schema( )->to_json( ) ) ) ) ##NO_TEXT.
       CATCH zcx_mcp_ajson_error.
         response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
         response-error-message = |Error creating tool definition| ##NO_TEXT.
@@ -42,12 +46,24 @@ CLASS zcl_mcp_test_mcp_session IMPLEMENTATION.
     CASE request->get_name( ).
       WHEN `Test MCP Session`.
         DATA(input) = request->get_arguments( ).
+
+        " Validate input parameter via schema validator class
+        TRY.
+            DATA(schema) = get_increment_schema( ).
+            DATA(validator) = NEW zcl_mcp_schema_validator( schema->to_json( ) ).
+            DATA(validation_result) = validator->validate( input ).
+            IF validation_result = abap_false.
+              response-error-code    = zcl_mcp_jsonrpc=>error_codes-invalid_params.
+              response-error-message = concat_lines_of( validator->get_errors( ) ).
+              RETURN.
+            ENDIF.
+          CATCH zcx_mcp_ajson_error INTO DATA(error).
+            response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
+            response-error-message = error->get_text( ).
+            RETURN.
+        ENDTRY.
+
         DATA(increment) = input->get_integer( `increment` ).
-        IF increment IS INITIAL.
-          response-error-code    = zcl_mcp_jsonrpc=>error_codes-invalid_params.
-          response-error-message = |Increment value is required.| ##NO_TEXT.
-          RETURN.
-        ENDIF.
 
         " Get the last increment value from the session
         DATA(session_increment) = session->get( `increment` ).
@@ -72,6 +88,15 @@ CLASS zcl_mcp_test_mcp_session IMPLEMENTATION.
 
   METHOD get_session_mode.
     result = zcl_mcp_session=>session_mode_mcp.
+  ENDMETHOD.
+
+  METHOD get_increment_schema.
+    result = NEW zcl_mcp_schema_builder( ).
+    result->add_integer( name        = `increment`
+                         description = `Increment value`
+                         required    = abap_true
+                         minimum     = 1
+                         maximum     = 1000000 ) ##NO_TEXT.
   ENDMETHOD.
 
 ENDCLASS.

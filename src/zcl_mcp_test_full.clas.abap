@@ -19,6 +19,7 @@ CLASS zcl_mcp_test_full DEFINITION
 
   PRIVATE SECTION.
     METHODS get_gif RETURNING VALUE(result) TYPE string.
+    METHODS get_input_schema RETURNING VALUE(result) TYPE REF TO zcl_mcp_schema_builder RAISING zcx_mcp_ajson_error.
 ENDCLASS.
 
 
@@ -182,25 +183,11 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
 
   METHOD handle_list_tools.
     TRY.
-        " Either use method chaining or ensure to update the schema reference
-        DATA(schema) = NEW zcl_mcp_schema_builder( ).
-        schema = schema->add_string( name        = `TextInput`
-                                     description = `Input text with a maximum of 100 characters`
-                                     required    = abap_true ) ##NO_TEXT.
-        schema = schema->begin_array( `TestInputArray` ) ##NO_TEXT.
-        schema = schema->add_integer( name        = `Line`
-                                      description = `Line number`
-                                      required    = abap_true ) ##NO_TEXT.
-        schema = schema->add_string( name        = `Text`
-                                     description = `Text`
-                                     required    = abap_true ) ##NO_TEXT.
-        schema = schema->end_array( ).
-
         response-result->set_tools( VALUE #( ( name         = `All Content Types`
                                                description  = `A test tool that returns all content types` )
                                              ( name         = `Input Test`
                                                description  = `A test tool with a complex input`
-                                               input_schema = schema->to_json( ) )
+                                               input_schema = get_input_schema( )->to_json( ) )
                                              ( name         = `Error Test`
                                                description  = `A test tool that always return error as truet` ) ) ) ##NO_TEXT.
       CATCH zcx_mcp_ajson_error.
@@ -236,6 +223,23 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
 
       WHEN 'Input Test'.
         DATA(arguments) = request->get_arguments( ).
+
+        " Validate input parameter via schema validator class
+        TRY.
+            DATA(schema) = get_input_schema( ).
+            DATA(validator) = NEW zcl_mcp_schema_validator( schema->to_json( ) ).
+            DATA(validation_result) = validator->validate( arguments ).
+            IF validation_result = abap_false.
+              response-error-code    = zcl_mcp_jsonrpc=>error_codes-invalid_params.
+              response-error-message = concat_lines_of( validator->get_errors( ) ).
+              RETURN.
+            ENDIF.
+          CATCH zcx_mcp_ajson_error INTO DATA(error).
+            response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
+            response-error-message = error->get_text( ).
+            RETURN.
+        ENDTRY.
+
         DATA(text_input) = arguments->get_string( `TextInput` ).
         DATA: BEGIN OF input_line,
                 line TYPE i,
@@ -251,20 +255,7 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
             RETURN.
         ENDTRY.
 
-        IF text_input IS INITIAL.
-          response-error-code    = zcl_mcp_jsonrpc=>error_codes-invalid_params.
-          response-error-message = |Input parameter 'TextInput' is required| ##NO_TEXT.
-        ELSEIF strlen( text_input ) > 100.
-          response-error-code    = zcl_mcp_jsonrpc=>error_codes-invalid_params.
-          response-error-message = |Input parameter 'TextInput' is too long| ##NO_TEXT.
-        ENDIF.
-
         LOOP AT input_array ASSIGNING FIELD-SYMBOL(<input_array>).
-          IF <input_array>-line IS INITIAL OR <input_array>-text IS INITIAL.
-            response-error-code    = zcl_mcp_jsonrpc=>error_codes-invalid_params.
-            response-error-message = |Input parameter 'TestInputArray' is required| ##NO_TEXT.
-            RETURN.
-          ENDIF.
           response-result->add_text_content( |Line { <input_array>-line } : { <input_array>-text }| ) ##NO_TEXT.
         ENDLOOP.
       WHEN OTHERS.
@@ -275,6 +266,23 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
 
   METHOD get_session_mode.
     result = zcl_mcp_session=>session_mode_stateless.
+  ENDMETHOD.
+
+  METHOD get_input_schema.
+    DATA(schema) = NEW zcl_mcp_schema_builder( ).
+    schema->add_string( name        = `TextInput`
+                        description = `Input text with a maximum of 100 characters`
+                        required    = abap_true
+                        max_length  = 100 ) ##NO_TEXT.
+    schema->begin_array( `TestInputArray` ) ##NO_TEXT.
+    schema->add_integer( name        = `Line`
+                         description = `Line number`
+                         required    = abap_true ) ##NO_TEXT.
+    schema->add_string( name        = `Text`
+                        description = `Text`
+                        required    = abap_true ) ##NO_TEXT.
+    schema->end_array( ).
+    result = schema.
   ENDMETHOD.
 
 ENDCLASS.
