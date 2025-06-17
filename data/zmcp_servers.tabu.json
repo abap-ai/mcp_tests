@@ -2,6 +2,12 @@
   {
     "client": "001",
     "area": "test",
+    "server": "test_annotations",
+    "class": "ZCL_MCP_TEST_ANNOTATIONS"
+  },
+  {
+    "client": "001",
+    "area": "test",
     "server": "test_full",
     "class": "ZCL_MCP_TEST_FULL"
   },

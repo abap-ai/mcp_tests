@@ -29,10 +29,6 @@ CLASS zcl_mcp_test_mcp_session IMPLEMENTATION.
 
   METHOD handle_list_tools.
     TRY.
-        " TODO: variable is assigned but never used (ABAP cleaner)
-        DATA(schema) = NEW zcl_mcp_schema_builder( )->add_integer( name        = `increment`
-                                                                   description = `Increment the given number`
-                                                                   required    = abap_true ) ##NO_TEXT.
         response-result->set_tools( VALUE #( ( name         = `Test MCP Session`
                                                description  = `Using MCP sessions we increment by the given number`
                                                input_schema = get_increment_schema( )->to_json( ) ) ) ) ##NO_TEXT.
