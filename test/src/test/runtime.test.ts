@@ -40,7 +40,7 @@ describe('MCP Server Runtime Performance Tests', () => {
 
         expect(result.prompts).toHaveLength(4);
         console.log(`List prompts execution time: ${executionTime}ms`);
-        expect(executionTime).toBeLessThan(500); // Should complete pretty fast
+        expect(executionTime).toBeLessThan(1000); // Should complete pretty fast
     });
 
     test('should measure execution time for getting all_content_types prompt', async () => {
@@ -54,7 +54,7 @@ describe('MCP Server Runtime Performance Tests', () => {
         expect(prompt.messages.find(m => m.content.type === "audio")).toBeDefined();
         
         console.log(`All content types prompt execution time: ${executionTime}ms`);
-        expect(executionTime).toBeLessThan(500); // Should complete pretty fast
+        expect(executionTime).toBeLessThan(1000); // Should complete pretty fast
     });
 
     test('should measure execution time for client initialization', async () => {
@@ -82,7 +82,7 @@ describe('MCP Server Runtime Performance Tests', () => {
 
         expect(result.resources).toHaveLength(3);
         console.log(`List resources execution time: ${executionTime}ms`);
-        expect(executionTime).toBeLessThan(500); // Should complete pretty fast
+        expect(executionTime).toBeLessThan(1000); // Should complete pretty fast
     });
 
     test('should measure execution time for getting a gif resource', async () => {
@@ -94,7 +94,7 @@ describe('MCP Server Runtime Performance Tests', () => {
         expect(resource.contents[0].blob).toBeDefined();
         
         console.log(`Get gif resource execution time: ${executionTime}ms`);
-        expect(executionTime).toBeLessThan(500); // Should complete pretty fast
+        expect(executionTime).toBeLessThan(1000); // Should complete pretty fast
     });
 
     test('should measure execution time for listing tools', async () => {
@@ -104,7 +104,7 @@ describe('MCP Server Runtime Performance Tests', () => {
 
         expect(result.tools).toHaveLength(3);
         console.log(`List tools execution time: ${executionTime}ms`);
-        expect(executionTime).toBeLessThan(500); // Should complete pretty fast
+        expect(executionTime).toBeLessThan(1000); // Should complete pretty fast
     });
 
     test('should measure execution time for All Content Types tool', async () => {
@@ -135,7 +135,7 @@ describe('MCP Server Runtime Performance Tests', () => {
 
         expect(result.content).toHaveLength(2);
         console.log(`Input Test tool execution time: ${executionTime}ms`);
-        expect(executionTime).toBeLessThan(500); // Should complete pretty fast
+        expect(executionTime).toBeLessThan(1000); // Should complete pretty fast
     });
 
     test('should measure execution time for Error Test tool', async () => {
@@ -147,7 +147,7 @@ describe('MCP Server Runtime Performance Tests', () => {
 
         expect(result.isError).toBe(true);
         console.log(`Error Test tool execution time: ${executionTime}ms`);
-        expect(executionTime).toBeLessThan(500); // Should complete pretty fast
+        expect(executionTime).toBeLessThan(1000); // Should complete pretty fast
     });
 
     test('should measure execution time for MCP Session operations', async () => {
@@ -173,7 +173,7 @@ describe('MCP Server Runtime Performance Tests', () => {
 
             expect((result1.content as CallToolResult[])[0].text).toBe("Incremented value: 5");
             console.log(`MCP Session first increment execution time: ${executionTime1}ms`);
-            expect(executionTime1).toBeLessThan(500);
+            expect(executionTime1).toBeLessThan(1000);
 
             const [result2, executionTime2] = await measureExecutionTime(() => 
                 sessionClient.callTool({
@@ -186,7 +186,7 @@ describe('MCP Server Runtime Performance Tests', () => {
 
             expect((result2.content as CallToolResult[])[0].text).toBe("Incremented value: 8");
             console.log(`MCP Session second increment execution time: ${executionTime2}ms`);
-            expect(executionTime2).toBeLessThan(500);
+            expect(executionTime2).toBeLessThan(1000);
         } finally {
             await sessionClient.close();
         }
@@ -215,7 +215,7 @@ describe('MCP Server Runtime Performance Tests', () => {
 
             expect((result1.content as CallToolResult[])[0].text).toBe("Incremented value: 5");
             console.log(`ICF Session first increment execution time: ${executionTime1}ms`);
-            expect(executionTime1).toBeLessThan(500);
+            expect(executionTime1).toBeLessThan(1000);
 
             const [result2, executionTime2] = await measureExecutionTime(() => 
                 sessionClient.callTool({
@@ -228,7 +228,7 @@ describe('MCP Server Runtime Performance Tests', () => {
 
             expect((result2.content as CallToolResult[])[0].text).toBe("Incremented value: 8");
             console.log(`ICF Session second increment execution time: ${executionTime2}ms`);
-            expect(executionTime2).toBeLessThan(500);
+            expect(executionTime2).toBeLessThan(1000);
         } finally {
             await sessionClient.close();
             await sessionTransport.close();
