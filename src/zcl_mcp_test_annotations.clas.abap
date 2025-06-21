@@ -76,8 +76,12 @@ CLASS zcl_mcp_test_annotations IMPLEMENTATION.
       RETURN.
     ENDIF.
 
+    DATA timestamp TYPE timestamp.
+    GET TIME STAMP FIELD timestamp.
+
     response-result->add_audio_content( mime_type   = `audio/mpeg`
-                                        annotations = VALUE #( audience = VALUE #( ( zif_mcp_server=>role_user ) ) priority = '0.1' )
+                                        annotations = VALUE #( audience = VALUE #( ( zif_mcp_server=>role_user ) )
+                                                               priority = '0.1' )
                                         data        = `SGVsbG8=` ).
     response-result->add_blob_resource( uri         = `http://example.com/blob`
                                         mime_type   = `application/octet-stream`
@@ -90,8 +94,9 @@ CLASS zcl_mcp_test_annotations IMPLEMENTATION.
                                         data        = `SGVsbG8=` ).
     response-result->add_text_resource( uri         = `http://example.com/text`
                                         mime_type   = `text/plain`
-                                        annotations = VALUE #( audience = VALUE #( ( zif_mcp_server=>role_user ) )
-                                                               priority = '0.1' )
+                                        annotations = VALUE #( audience      = VALUE #( ( zif_mcp_server=>role_user ) )
+                                                               priority      = '0.1'
+                                                               last_modified = timestamp )
                                         text        = `This is a dummy text resource` ).
     response-result->add_text_content( annotations = VALUE #( audience = VALUE #( ( zif_mcp_server=>role_assistant ) )
                                                               priority = '0.1' )

@@ -35,6 +35,19 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD handle_list_prompts.
+    DATA(meta) = zcl_mcp_ajson=>create_empty( ).
+
+    TRY.
+        " Hint: Slash in the path is replaced by ~1
+        meta->set( iv_path = `abapai~1test1`
+                   iv_val  = `This is a test meta information` ).
+        meta->set( iv_path = `abapai~1test2`
+                   iv_val  = `This is another test meta information` ).
+      CATCH zcx_mcp_ajson_error.
+        " No need to handle, the test will fail then
+        RETURN.
+    ENDTRY.
+
     response-result->set_prompts(
         VALUE #(
             ( name        = `simple`
@@ -44,7 +57,12 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
               arguments   = VALUE #( ( name = `optional` description = `Optional argument` required = abap_false )
                                      ( name = `required` description = `Required argument` required = abap_true ) ) )
             ( name = `all_content_types` description = `A test prompt that returns all five content types` )
-            ( name = `ordered` description = `Multiple responses to ensure order is preserved` ) ) ) ##NO_TEXT.
+            ( name = `ordered` description = `Multiple responses to ensure order is preserved` )
+            ( name        = `test_meta`
+              description = `Adding Meta Information`
+              meta        = meta
+              title       = `Test Meta Tile`
+              arguments   = VALUE #( ( name = `testArg` title = `Test Arg Title` description = `Test Arg Description` ) )  ) ) ) ##NO_TEXT.
   ENDMETHOD.
 
   METHOD handle_get_prompt.
@@ -80,6 +98,23 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
         ENDIF.
 
       WHEN `all_content_types`.
+        " Test prompt that returns meta information`
+        DATA(meta) = zcl_mcp_ajson=>create_empty( ).
+        DATA(meta2) = zcl_mcp_ajson=>create_empty( ).
+        TRY.
+            " Hint: Slash in the path is replaced by ~1
+            meta->set( iv_path = `abapai~1promptTest`
+                       iv_val  = `This is a test meta information` ).
+            meta2->set( iv_path = `abapai~1reslinkTest`
+                        iv_val  = `This is a test resource link meta information` ).
+          CATCH zcx_mcp_ajson_error.
+            " No need to handle, the test will fail then
+            RETURN.
+        ENDTRY.
+
+        response-result->set_description( `A test prompt that returns all five content types` ) ##NO_TEXT.
+        response-result->set_meta( meta ).
+
         " Test prompt that returns all five content types
         response-result->add_text_message( role = zif_mcp_server=>role_user
                                            text = |Text Message| ) ##NO_TEXT.
@@ -106,6 +141,13 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
                                             data      = gif
                                             mime_type = 'audio/wav' ).
 
+        response-result->add_resource_link_message( description = `Resource Link`
+                                                    title       = `Link Title`
+                                                    name        = `Link Name`
+                                                    role        = zif_mcp_server=>role_user
+                                                    uri         = `http://blubb.wuff/abcdf`
+                                                    meta        = meta2 ) ##NO_TEXT.
+
       WHEN `ordered`.
         " Test prompt that returns multiple messages
         response-result->add_text_message( role = zif_mcp_server=>role_user
@@ -116,6 +158,29 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
                                                     mime_type = 'text/markdown' ) ##NO_TEXT.
         response-result->add_text_message( role = zif_mcp_server=>role_user
                                            text = |This is the third message| ) ##NO_TEXT.
+
+      WHEN `test_meta`.
+        " Test prompt that returns meta information`
+        meta = zcl_mcp_ajson=>create_empty( ).
+        meta2 = zcl_mcp_ajson=>create_empty( ).
+        TRY.
+            " Hint: Slash in the path is replaced by ~1
+            meta->set( iv_path = `abapai~1promptTest`
+                       iv_val  = `This is a test meta information` ).
+            meta2->set( iv_path = `abapai~1reslinkTest`
+                        iv_val  = `This is a test resource link meta information` ).
+          CATCH zcx_mcp_ajson_error.
+            " No need to handle, the test will fail then
+            RETURN.
+        ENDTRY.
+        response-result->set_description( `Adding Meta Information` ) ##NO_TEXT.
+        response-result->set_meta( meta ).
+        response-result->add_resource_link_message( description = `Resource Link`
+                                                    title       = `Link Title`
+                                                    name        = `Link Name`
+                                                    role        = zif_mcp_server=>role_user
+                                                    uri         = `http://blubb.wuff/abcdf`
+                                                    meta        = meta2 ) ##NO_TEXT.
       WHEN OTHERS.
         response-error-code    = zcl_mcp_jsonrpc=>error_codes-invalid_params.
         response-error-message = |Prompt { request->get_name( ) } not found.| ##NO_TEXT.
