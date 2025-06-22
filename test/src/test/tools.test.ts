@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { BlobResourceContents, CallToolResult, TextResourceContents } from "@modelcontextprotocol/sdk/types.js";
+import { BlobResourceContents, CallToolResult, ResourceLink, TextResourceContents } from "@modelcontextprotocol/sdk/types.js";
 
 describe('MCP Server Tools Tests', () => {
     const baseUrl = new URL("http://localhost:8000/zmcp");
@@ -27,7 +27,7 @@ describe('MCP Server Tools Tests', () => {
 
     test('List tools should return three tools', async () => {
         const tools = (await client.listTools()).tools;
-        expect(tools).toHaveLength(3);
+        expect(tools).toHaveLength(4);
     });
 
     test('List tools should include specific tools', async () => {
@@ -47,9 +47,14 @@ describe('MCP Server Tools Tests', () => {
         const result = await client.callTool({ 
             name: "All Content Types"
         });
-        
+
+        // Check meta information on the result
+        expect(result._meta).toBeDefined();
+        expect(result._meta?.["abapai/toolTest"]).toBe("This is a test meta information");
+
         const content = result.content as CallToolResult[]; 
-        expect(content).toHaveLength(5);
+        expect(content).toHaveLength(6); // Now expecting 6 items
+
         expect(content[0].text).toBe("Text Message");
         expect(content[1].mimeType).toBe("image/gif");
         const textResource = (content[2].resource as unknown) as TextResourceContents;
@@ -57,6 +62,16 @@ describe('MCP Server Tools Tests', () => {
         const blobResource = (content[3].resource as unknown) as BlobResourceContents;
         expect(blobResource.uri).toBe("file://okay-.gif");
         expect(content[4].mimeType).toBe("audio/wav");
+
+        // New: Check the resource link
+        const resourceLink = content[5] as unknown as ResourceLink;
+        expect(resourceLink.type).toBe("resource_link");
+        expect(resourceLink.description).toBe("Resource Link");
+        expect(resourceLink.title).toBe("Link Title");
+        expect(resourceLink.name).toBe("Link Name");
+        expect(resourceLink.uri).toBe("http://blubb.wuff/abcdf");
+        expect(resourceLink._meta).toBeDefined();
+        expect(resourceLink._meta?.["abapai/reslinkTest"]).toBe("This is a test resource link meta information");
     });
 
     test('Should execute Input Test tool successfully', async () => {
@@ -101,5 +116,28 @@ describe('MCP Server Tools Tests', () => {
         expect(result.isError).toBe(true);
         const content = result.content as CallToolResult[];
         expect(content[0].text).toBe("This is an error test");
+    });
+
+    test('Should execute Structured Output Test tool', async () => {
+        const result = await client.callTool({
+            name: "Structured Output Test"
+        });
+
+        // Check structured content
+        const structured = result.structuredContent as Record<string, unknown>;
+        expect(structured).toBeDefined();
+        expect(structured.test_string).toBe("This is a test string");
+        expect(structured.test_object).toBeDefined();
+        expect((structured.test_object as any).test_object_string).toBe("This is a test string in an object");
+        expect((structured.test_object as any).test_object_integer).toBe(42);
+
+        // Optionally: Check output schema if returned
+        if (result.outputSchema) {
+            expect(result.outputSchema).toHaveProperty("test_string");
+            expect(result.outputSchema).toHaveProperty("test_object");
+            const outputSchema = result.outputSchema as { test_object?: { test_object_string?: unknown; test_object_integer?: unknown } };
+            expect(outputSchema.test_object).toHaveProperty("test_object_string");
+            expect(outputSchema.test_object).toHaveProperty("test_object_integer");
+        }
     });
 });

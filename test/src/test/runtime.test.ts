@@ -38,7 +38,7 @@ describe('MCP Server Runtime Performance Tests', () => {
             client.listPrompts()
         );
 
-        expect(result.prompts).toHaveLength(4);
+        expect(result.prompts).toHaveLength(5);
         console.log(`List prompts execution time: ${executionTime}ms`);
         expect(executionTime).toBeLessThan(1000); // Should complete pretty fast
     });
@@ -102,7 +102,7 @@ describe('MCP Server Runtime Performance Tests', () => {
             client.listTools()
         );
 
-        expect(result.tools).toHaveLength(3);
+        expect(result.tools).toHaveLength(4);
         console.log(`List tools execution time: ${executionTime}ms`);
         expect(executionTime).toBeLessThan(1000); // Should complete pretty fast
     });
@@ -114,7 +114,7 @@ describe('MCP Server Runtime Performance Tests', () => {
             })
         );
 
-        expect(result.content).toHaveLength(5);
+        expect(result.content).toHaveLength(6);
         console.log(`All Content Types tool execution time: ${executionTime}ms`);
         expect(executionTime).toBeLessThan(1000); // Allow 1s for content generation
     });

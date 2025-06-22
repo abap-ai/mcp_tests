@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.3",
+    "@modelcontextprotocol/sdk": "^1.13.0",
     "@types/node-fetch": "^2.6.12",
     "node-fetch": "^2.7.0"
   },
@@ -11,7 +11,7 @@
     "@typescript-eslint/parser": "^8.34.1",
     "eslint": "^9.29.0",
     "eslint-config-prettier": "^10.1.5",
-    "jest": "^30.0.0",
+    "jest": "^30.0.2",
     "nodemon": "^3.1.10",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",

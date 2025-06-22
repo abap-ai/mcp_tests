@@ -86,6 +86,10 @@ describe('MCP Server Annotations Tests', () => {
         expect(textResource?.annotations).toBeDefined();
         expect(textResource?.annotations?.audience).toContain("user");
         expect(textResource?.annotations?.priority).toBe(0.1);
+        expect(textResource?.annotations?.lastModified).toBeDefined();
+        expect(typeof textResource?.annotations?.lastModified).toBe("string");
+        // Check if lastModified is a valid ISO 8601 date string
+        expect(() => new Date(textResource?.annotations?.lastModified).toISOString()).not.toThrow();
 
         // Check blob resource type
         const blobResource = contentArray.find(c => 
