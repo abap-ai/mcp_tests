@@ -248,13 +248,34 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
 
   METHOD handle_list_tools.
     TRY.
-        response-result->set_tools( VALUE #( ( name         = `All Content Types`
-                                               description  = `A test tool that returns all content types` )
-                                             ( name         = `Input Test`
-                                               description  = `A test tool with a complex input`
-                                               input_schema = get_input_schema( )->to_json( ) )
-                                             ( name         = `Error Test`
-                                               description  = `A test tool that always return error as truet` ) ) ) ##NO_TEXT.
+        DATA(meta) = zcl_mcp_ajson=>create_empty( ).
+        meta->set( iv_path = `abapai~1toolTest`
+                   iv_val  = `This is a test meta information` ).
+        DATA(output_schema) = NEW zcl_mcp_schema_builder( ).
+        output_schema->add_string( name        = `test_string`
+                                   description = `Just a test string`
+                                   required    = abap_true ) ##NO_TEXT.
+        output_schema->begin_object( `test_object` ) ##NO_TEXT.
+        output_schema->add_string( name        = `test_object_string`
+                                   description = `Just a test string in an object`
+                                   required    = abap_true ) ##NO_TEXT.
+        output_schema->add_integer( name        = `test_object_integer`
+                                    description = `Just a test integer in an object`
+                                    required    = abap_true ) ##NO_TEXT.
+        output_schema->end_object( ).
+
+        response-result->set_tools( VALUE #( ( name          = `All Content Types`
+                                               description   = `A test tool that returns all content types` )
+                                             ( name          = `Input Test`
+                                               description   = `A test tool with a complex input`
+                                               input_schema  = get_input_schema( )->to_json( ) )
+                                             ( name          = `Error Test`
+                                               description   = `A test tool that always return error as truet` )
+                                             ( name          = `Structured Output Test`
+                                               description   = `Test for structured output`
+                                               meta          = meta
+                                               output_schema = output_schema->to_json( )
+                                               title         = `Test for structured ouptut` ) ) ) ##NO_TEXT.
       CATCH zcx_mcp_ajson_error.
         response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
         response-error-message = |Error creating tool definition| ##NO_TEXT.
@@ -266,6 +287,20 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
 
     CASE tool_name.
       WHEN 'All Content Types'.
+        DATA(meta) = zcl_mcp_ajson=>create_empty( ).
+        DATA(meta2) = zcl_mcp_ajson=>create_empty( ).
+        TRY.
+            " Hint: Slash in the path is replaced by ~1
+            meta->set( iv_path = `abapai~1toolTest`
+                       iv_val  = `This is a test meta information` ).
+            meta2->set( iv_path = `abapai~1reslinkTest`
+                        iv_val  = `This is a test resource link meta information` ).
+          CATCH zcx_mcp_ajson_error.
+            " No need to handle, the test will fail then
+            RETURN.
+        ENDTRY.
+
+        response-result->set_meta( meta ).
         response-result->add_text_content( |Text Message| ) ##NO_TEXT.
         " We reuse the gif from image content, usually you'd use appropriate files for the different content types
         DATA(gif) = get_gif( ).
@@ -279,6 +314,11 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
                                             mime_type = 'image/gif' ) ##NO_TEXT.
         response-result->add_audio_content( data      = gif
                                             mime_type = 'audio/wav' ) ##NO_TEXT.
+        response-result->add_resource_link( description = `Resource Link`
+                                            title       = `Link Title`
+                                            name        = `Link Name`
+                                            uri         = `http://blubb.wuff/abcdf`
+                                            meta        = meta2 ) ##NO_TEXT.
 
       WHEN 'Error Test'.
         " Note this is for when the tool was called correctly but has internal execution issues.
@@ -305,6 +345,7 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
             RETURN.
         ENDTRY.
 
+        " TODO: variable is assigned but never used (ABAP cleaner)
         DATA(text_input) = arguments->get_string( `TextInput` ).
         DATA: BEGIN OF input_line,
                 line TYPE i,
@@ -323,6 +364,22 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
         LOOP AT input_array ASSIGNING FIELD-SYMBOL(<input_array>).
           response-result->add_text_content( |Line { <input_array>-line } : { <input_array>-text }| ) ##NO_TEXT.
         ENDLOOP.
+      WHEN `Structured Output Test`.
+        " This is a test for structured output
+        DATA(output) = zcl_mcp_ajson=>create_empty( ).
+        TRY.
+            output->set( iv_path = `test_string`
+                         iv_val  = `This is a test string` ).
+            output->set( iv_path = `test_object/test_object_string`
+                         iv_val  = `This is a test string in an object` ).
+            output->set( iv_path = `test_object/test_object_integer`
+                         iv_val  = 42 ).
+          CATCH zcx_mcp_ajson_error.
+            response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
+            response-error-message = |Error creating tool output| ##NO_TEXT.
+            RETURN.
+        ENDTRY.
+        response-result->set_structured_content( output ).
       WHEN OTHERS.
         response-error-code    = zcl_mcp_jsonrpc=>error_codes-invalid_params.
         response-error-message = |Tool { tool_name } not found.| ##NO_TEXT.
