@@ -41,7 +41,7 @@ CLASS zcl_mcp_test_annotations IMPLEMENTATION.
                                      idempotenthint  = abap_true
                                      openworldhint   = abap_true
                                      readonlyhint    = abap_true
-                                     title           = `Human Readable Title` ) )
+                                     title           = `Human Readable Title`  ) )
             ( name        = `DestructiveOnly`
               description = `Destructive Hint`
               annotations = VALUE #( destructivehint = abap_true ) )
@@ -49,7 +49,7 @@ CLASS zcl_mcp_test_annotations IMPLEMENTATION.
             ( name = `OpenWorldOnly` description = `OpenWorld Only` annotations = VALUE #( openworldhint = abap_true ) )
             ( name        = `IdempotentOnly`
               description = `Idempotent Only`
-              annotations = VALUE #( idempotenthint = abap_true ) ) ) ).
+              annotations = VALUE #( idempotenthint = abap_true ) ) ) ) ##NO_TEXT.
   ENDMETHOD.
 
   METHOD handle_list_resources.
@@ -58,7 +58,7 @@ CLASS zcl_mcp_test_annotations IMPLEMENTATION.
                                           uri         = `http://example.com/annotation_test_resource`
                                           mime_type   = `text`
                                           annotations = VALUE #( audience = VALUE #( ( zif_mcp_server=>role_user ) )
-                                                                 priority = '0.1' ) ) ) ).
+                                                                 priority = '0.1' ) ) ) ) ##NO_TEXT.
   ENDMETHOD.
 
   METHOD handle_list_res_tmpls.
@@ -67,7 +67,7 @@ CLASS zcl_mcp_test_annotations IMPLEMENTATION.
                                                         mime_type   = `text`
                                                         annotations = VALUE #(
                                                             audience = VALUE #( ( zif_mcp_server=>role_user ) )
-                                                            priority = '0.1' ) ) ) ).
+                                                            priority = '0.1' ) ) ) ) ##NO_TEXT.
   ENDMETHOD.
 
   METHOD handle_call_tool.
@@ -97,10 +97,10 @@ CLASS zcl_mcp_test_annotations IMPLEMENTATION.
                                         annotations = VALUE #( audience      = VALUE #( ( zif_mcp_server=>role_user ) )
                                                                priority      = '0.1'
                                                                last_modified = timestamp )
-                                        text        = `This is a dummy text resource` ).
+                                        text        = `This is a dummy text resource` ) ##NO_TEXT.
     response-result->add_text_content( annotations = VALUE #( audience = VALUE #( ( zif_mcp_server=>role_assistant ) )
                                                               priority = '0.1' )
-                                       text        = `Dummy Text` ).
+                                       text        = `Dummy Text` ) ##NO_TEXT.
   ENDMETHOD.
 
 ENDCLASS.
