@@ -28,6 +28,10 @@ CLASS zcl_mcp_test_full DEFINITION
     METHODS get_async_task_schema
       RETURNING VALUE(result) TYPE REF TO zcl_mcp_schema_builder
       RAISING   zcx_mcp_ajson_error.
+
+    METHODS run_async_task_test
+      IMPORTING !request  TYPE REF TO zcl_mcp_req_call_tool
+      CHANGING  !response TYPE zif_mcp_server=>call_tool_response.
 ENDCLASS.
 
 
@@ -293,7 +297,8 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
     " --- All Content Types: icon, no schema ---
     tool-name        = `All Content Types`.
     tool-description = `A test tool that returns all content types` ##NO_TEXT.
-    APPEND VALUE #( src = `/sap/public/bc/WebIcons/w_s_okay.gif` mime_type = `image/gif` ) TO tool-icons.
+    APPEND VALUE #( src       = `/sap/public/bc/WebIcons/w_s_okay.gif`
+                    mime_type = `image/gif` ) TO tool-icons.
     APPEND tool TO tools.
 
     " --- Input Test: icon + input schema ---
@@ -302,7 +307,8 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
         tool-name         = `Input Test`.
         tool-description  = `A test tool with a complex input` ##NO_TEXT.
         tool-input_schema = get_input_schema( )->to_json( ).
-        APPEND VALUE #( src = `/sap/public/bc/WebIcons/w_s_okay.gif` mime_type = `image/gif` ) TO tool-icons.
+        APPEND VALUE #( src       = `/sap/public/bc/WebIcons/w_s_okay.gif`
+                        mime_type = `image/gif` ) TO tool-icons.
         APPEND tool TO tools.
       CATCH zcx_mcp_ajson_error INTO DATA(schema_error).
         response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
@@ -318,7 +324,8 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
     TRY.
         CLEAR tool.
         DATA(meta) = zcl_mcp_ajson=>create_empty( ).
-        meta->set( iv_path = `abapai~1toolTest` iv_val = `This is a test meta information` ).
+        meta->set( iv_path = `abapai~1toolTest`
+                   iv_val  = `This is a test meta information` ).
 
         DATA(output_schema) = NEW zcl_mcp_schema_builder( ).
         output_schema->add_string( name        = `test_string`
@@ -338,7 +345,8 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
         tool-title         = `Test for structured output` ##NO_TEXT.
         tool-meta          = meta.
         tool-output_schema = output_schema->to_json( ).
-        APPEND VALUE #( src = `/sap/public/bc/WebIcons/w_s_okay.gif` mime_type = `image/gif` ) TO tool-icons.
+        APPEND VALUE #( src       = `/sap/public/bc/WebIcons/w_s_okay.gif`
+                        mime_type = `image/gif` ) TO tool-icons.
         APPEND tool TO tools.
       CATCH zcx_mcp_ajson_error INTO DATA(output_error).
         response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
@@ -349,15 +357,22 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
     " --- Async Task Test: execution + icon with sizes/theme ---
     TRY.
         CLEAR tool.
-        tool-name        = `Async Task Test`.
-        tool-description = `Tests the full task lifecycle. mode=complete: immediate result; `
-                        && `mode=fail: immediate failure; mode=stay_working: stays running `
-                        && `for polling and cancellation testing.` ##NO_TEXT.
-        tool-execution   = VALUE #( task_support = zcl_mcp_resp_list_tools=>task_support-optional ).
+        tool-name         = `Async Task Test`.
+        tool-description  = |Tests the full task lifecycle. mode=complete: immediate result; |
+                           && |mode=fail: immediate failure; mode=stay_working: stays running |
+                           && |for polling and cancellation testing.| ##NO_TEXT.
+        tool-execution    = VALUE #( task_support = zcl_mcp_resp_list_tools=>task_support-optional ).
         tool-input_schema = get_async_task_schema( )->to_json( ).
         APPEND VALUE #( src       = `/sap/public/bc/WebIcons/w_s_okay.gif`
                         mime_type = `image/gif`
                         sizes     = VALUE #( ( `16x16` ) ( `32x32` ) ) ) TO tool-icons.
+        APPEND tool TO tools.
+
+        CLEAR tool.
+        tool-name         = `Required Task Test`.
+        tool-description  = `Requires task-augmented execution.` ##NO_TEXT.
+        tool-execution    = VALUE #( task_support = zcl_mcp_resp_list_tools=>task_support-required ).
+        tool-input_schema = get_async_task_schema( )->to_json( ).
         APPEND tool TO tools.
       CATCH zcx_mcp_ajson_error INTO DATA(async_error).
         response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
@@ -458,81 +473,18 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
         response-result->set_structured_content( output ).
 
       WHEN `Async Task Test`.
-        IF request->has_task( ).
-          TRY.
-              DATA(args)    = request->get_arguments( ).
-              DATA(mode)    = args->get_string( `mode` ).
-              DATA(value)   = args->get_integer( `value` ).
-              DATA(ttl)     = COND i( WHEN request->get_task_ttl( ) > 0
-                                      THEN request->get_task_ttl( )
-                                      ELSE 300 ).
-              " create_task inserts directly in 'working' state — no update_status needed
-              DATA(task_id) = get_tasks( )->create_task( tool_name = request->get_name( )
-                                                         ttl       = ttl ).
-              CASE mode.
-                WHEN `complete`.
-                  " Hand off to background job — task stays 'working' until job finishes or is cancelled
-                  DATA job_count TYPE tbtcjob-jobcount.
-                  CALL FUNCTION 'JOB_OPEN'
-                    EXPORTING  jobname  = 'ZMCP_ASYNC_TEST'
-                    IMPORTING  jobcount = job_count
-                    EXCEPTIONS OTHERS   = 1.
-                  IF sy-subrc <> 0.
-                    zcl_mcp_tasks=>fail( task_id = task_id
-                                         message = 'Failed to open background job' ) ##NO_TEXT.
-                  ELSE.
-                    SUBMIT zmcp_demo_bg_task WITH p_taskid = task_id
-                                             WITH p_value  = value
-                           VIA JOB 'ZMCP_ASYNC_TEST' NUMBER job_count
-                           AND RETURN.
-                    CALL FUNCTION 'JOB_CLOSE'
-                      EXPORTING  jobcount  = job_count
-                                 jobname   = 'ZMCP_ASYNC_TEST'
-                                 strtimmed = abap_true
-                      EXCEPTIONS OTHERS    = 1.
-                    IF sy-subrc <> 0.
-                      zcl_mcp_tasks=>fail( task_id = task_id
-                                           message = 'Failed to schedule background job' ) ##NO_TEXT.
-                    ENDIF.
-                  ENDIF.
+        run_async_task_test( EXPORTING request  = request
+                             CHANGING  response = response ).
 
-                WHEN `fail`.
-                  zcl_mcp_tasks=>fail( task_id = task_id
-                                       message = `Simulated task failure for testing` ) ##NO_TEXT.
-
-                WHEN `input_required`.
-                  " Tests the working → input_required transition
-                  zcl_mcp_tasks=>update_status( task_id = task_id
-                                                status  = zcl_mcp_tasks=>status_input_required
-                                                message = `Provide additional input to continue` ) ##NO_TEXT.
-
-                WHEN `stay_working`.
-                  " Task is already in 'working' — nothing to do; client tests polling and cancel
-
-                WHEN OTHERS.
-                  zcl_mcp_tasks=>fail( task_id = task_id
-                                       message = |Unknown mode '{ mode }'| ) ##NO_TEXT.
-              ENDCASE.
-
-              DATA(task) = get_tasks( )->get( task_id ).
-              response-result->set_task_result( task ).
-            CATCH zcx_mcp_server INTO DATA(task_error).
-              response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
-              response-error-message = task_error->get_text( ).
-            CATCH zcx_mcp_ajson_error INTO DATA(json_error).
-              response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
-              response-error-message = json_error->get_text( ).
-          ENDTRY.
-        ELSE.
-          " Synchronous fallback
-          TRY.
-              DATA(sync_value) = request->get_arguments( )->get_integer( `value` ).
-              response-result->add_text_content( |{ sync_value }² = { sync_value * sync_value } (synchronous execution)| ) ##NO_TEXT.
-            CATCH zcx_mcp_ajson_error.
-              response-result->add_text_content( `Async Task Test — synchronous execution` ) ##NO_TEXT.
-          ENDTRY.
+      WHEN `Required Task Test`.
+        IF request->has_task( ) = abap_false.
+          response-error-code    = zcl_mcp_jsonrpc=>error_codes-invalid_request.
+          response-error-message = `Required Task Test requires task execution` ##NO_TEXT.
+          RETURN.
         ENDIF.
 
+        run_async_task_test( EXPORTING request  = request
+                             CHANGING  response = response ).
       WHEN OTHERS.
         response-error-code    = zcl_mcp_jsonrpc=>error_codes-invalid_params.
         response-error-message = |Tool { tool_name } not found.| ##NO_TEXT.
@@ -584,20 +536,17 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
 
   METHOD get_async_task_schema.
     DATA(schema) = NEW zcl_mcp_schema_builder( ).
-    schema->add_string(
-        name        = `mode`
-        description = `complete: succeed immediately; fail: fail immediately; `
-                   && `stay_working: stay running for polling/cancel testing; `
-                   && `input_required: transition to input_required state`
-        required    = abap_true
-        enum        = VALUE #( ( `complete` ) ( `fail` )
-                               ( `stay_working` ) ( `input_required` ) ) ) ##NO_TEXT.
-    schema->add_integer(
-        name        = `value`
-        description = `Integer to square in the completed result (default 0)`
-        required    = abap_false
-        minimum     = 0
-        maximum     = 1000 ) ##NO_TEXT.
+    schema->add_string( name        = `mode`
+                        description = |complete: succeed asynchronously; fail: fail immediately; |
+                                   && |complete_error: complete with isError payload; |
+                                   && |stay_working: stay running for polling/cancel testing|
+                        required    = abap_true
+                        enum        = VALUE #( ( `complete` ) ( `fail` ) ( `complete_error` ) ( `stay_working` ) ) ) ##NO_TEXT.
+    schema->add_integer( name        = `value`
+                         description = `Integer to square in the completed result (default 0)`
+                         required    = abap_false
+                         minimum     = 0
+                         maximum     = 1000 ) ##NO_TEXT.
     result = schema.
   ENDMETHOD.
 
@@ -667,6 +616,92 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
       ENDIF.
       response-result->add_value( candidate ).
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD run_async_task_test.
+    IF request->has_task( ).
+      TRY.
+          DATA(args)    = request->get_arguments( ).
+          DATA(mode)    = args->get_string( `mode` ).
+          DATA(value)   = args->get_integer( `value` ).
+          DATA(ttl)     = COND i( WHEN request->get_task_ttl( ) > 0
+                                  THEN request->get_task_ttl( )
+                                  ELSE 300 ).
+
+          DATA(task_id) = get_tasks( )->create_task( tool_name = request->get_name( )
+                                                     ttl       = ttl ).
+
+          CASE mode.
+            WHEN `complete`.
+              DATA job_count TYPE tbtcjob-jobcount.
+
+              CALL FUNCTION 'JOB_OPEN'
+                EXPORTING  jobname  = 'ZMCP_ASYNC_TEST'
+                IMPORTING  jobcount = job_count
+                EXCEPTIONS OTHERS   = 1.
+
+              IF sy-subrc <> 0.
+                zcl_mcp_tasks=>fail( task_id = task_id
+                                     message = 'Failed to open background job' ) ##NO_TEXT.
+              ELSE.
+                SUBMIT zmcp_demo_bg_task
+                       WITH p_taskid = task_id
+                       WITH p_value  = value
+                       VIA JOB 'ZMCP_ASYNC_TEST' NUMBER job_count
+                       AND RETURN.
+
+                CALL FUNCTION 'JOB_CLOSE'
+                  EXPORTING  jobcount  = job_count
+                             jobname   = 'ZMCP_ASYNC_TEST'
+                             strtimmed = abap_true
+                  EXCEPTIONS OTHERS    = 1.
+
+                IF sy-subrc <> 0.
+                  zcl_mcp_tasks=>fail( task_id = task_id
+                                       message = 'Failed to schedule background job' ) ##NO_TEXT.
+                ENDIF.
+              ENDIF.
+
+            WHEN `complete_error`.
+              DATA(task_result) = NEW zcl_mcp_resp_task_payload( ).
+              task_result->set_is_error( abap_true ).
+              task_result->add_text_content( `Simulated task result error for testing` ) ##NO_TEXT.
+
+              zcl_mcp_tasks=>complete( task_id = task_id
+                                       result  = task_result ).
+
+            WHEN `fail`.
+              zcl_mcp_tasks=>fail( task_id = task_id
+                                   message = `Simulated task failure for testing` ) ##NO_TEXT.
+
+            WHEN `stay_working`.
+              " Task is already in 'working' - client tests polling and cancel.
+
+            WHEN OTHERS.
+              zcl_mcp_tasks=>fail( task_id = task_id
+                                   message = |Unknown mode '{ mode }'| ) ##NO_TEXT.
+          ENDCASE.
+
+          DATA(task) = get_tasks( )->get( task_id ).
+          response-result->set_task_result( task ).
+
+        CATCH zcx_mcp_server INTO DATA(task_error).
+          response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
+          response-error-message = task_error->get_text( ).
+
+        CATCH zcx_mcp_ajson_error INTO DATA(json_error).
+          response-error-code    = zcl_mcp_jsonrpc=>error_codes-internal_error.
+          response-error-message = json_error->get_text( ).
+      ENDTRY.
+
+    ELSE.
+      TRY.
+          DATA(sync_value) = request->get_arguments( )->get_integer( `value` ).
+          response-result->add_text_content( |{ sync_value }² = { sync_value * sync_value } (synchronous execution)| ) ##NO_TEXT.
+        CATCH zcx_mcp_ajson_error.
+          response-result->add_text_content( `Async Task Test - synchronous execution` ) ##NO_TEXT.
+      ENDTRY.
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.
