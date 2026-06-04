@@ -626,7 +626,7 @@ CLASS zcl_mcp_test_full IMPLEMENTATION.
           DATA(value)   = args->get_integer( `value` ).
           DATA(ttl)     = COND i( WHEN request->get_task_ttl( ) > 0
                                   THEN request->get_task_ttl( )
-                                  ELSE 300 ).
+                                  ELSE 3600000 ).
 
           DATA(task_id) = get_tasks( )->create_task( tool_name = request->get_name( )
                                                      ttl       = ttl ).
