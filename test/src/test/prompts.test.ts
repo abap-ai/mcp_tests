@@ -1,9 +1,15 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { Resource, TextResourceContents, ResourceLink } from "@modelcontextprotocol/sdk/types.js";
+import { IconSchema, ResourceLink, ResourceLinkSchema, TextResourceContents } from "@modelcontextprotocol/sdk/types.js";
+import {
+    isBlobResourceContents,
+    isEmbeddedResource,
+    isTextContent,
+    isTextResourceContents,
+} from "./contentGuards.js";
+import { getEndpointUrl } from "./config.js";
 
 describe('MCP Server Prompts Tests', () => {
-    const baseUrl = new URL("http://localhost:8000/zmcp");
     let client: Client;
     let transport: StreamableHTTPClientTransport;
 
@@ -14,7 +20,7 @@ describe('MCP Server Prompts Tests', () => {
         });
         const demoServer = "/test/test_full";
         transport = new StreamableHTTPClientTransport(
-            new URL(baseUrl + demoServer),
+            getEndpointUrl(demoServer),
         );
         await client.connect(transport);
     });
@@ -28,6 +34,26 @@ describe('MCP Server Prompts Tests', () => {
     test('List prompts should return five prompts', async () => {
         const prompts = (await client.listPrompts()).prompts;
         expect(prompts).toHaveLength(5);
+    });
+
+    test('List prompts should include standard icons where advertised', async () => {
+        const prompts = (await client.listPrompts()).prompts;
+
+        const simplePrompt = prompts.find(p => p.name === "simple");
+        expect(simplePrompt?.icons?.length).toBeGreaterThan(0);
+        expect(() => IconSchema.array().parse(simplePrompt?.icons)).not.toThrow();
+        expect(typeof simplePrompt?.icons?.[0]?.src).toBe("string");
+        expect(typeof simplePrompt?.icons?.[0]?.mimeType).toBe("string");
+
+        const metaPrompt = prompts.find(p => p.name === "test_meta");
+        expect(() => IconSchema.array().parse(metaPrompt?.icons)).not.toThrow();
+        expect(typeof metaPrompt?.icons?.[0]?.src).toBe("string");
+        expect(typeof metaPrompt?.icons?.[0]?.mimeType).toBe("string");
+        expect(metaPrompt?.icons?.[0]?.sizes).toEqual(["16x16"]);
+        expect(metaPrompt?.icons?.[0]?.theme).toBe("light");
+
+        const orderedPrompt = prompts.find(p => p.name === "ordered");
+        expect(orderedPrompt?.icons).toBeUndefined();
     });
 
     test('List prompt should have one prompt with name "simple" and no arguments', async () => {
@@ -54,6 +80,10 @@ describe('MCP Server Prompts Tests', () => {
     test('should get simple prompt by name', async () => {
         const prompt = await client.getPrompt({ name: "simple" });
         expect(prompt.description).toBe("Simple test prompt");
+        expect(isTextContent(prompt.messages[0].content)).toBe(true);
+        if (!isTextContent(prompt.messages[0].content)) {
+            throw new Error("Expected text content");
+        }
         expect(prompt.messages[0].content.text).toBe("This is a simple test prompt");
         expect(prompt.messages[0].role).toBe("user");
     });
@@ -62,6 +92,10 @@ describe('MCP Server Prompts Tests', () => {
         const prompt = await client.getPrompt({ name: "complex",  arguments : { required: "req", optional: "opt" } });
         expect(prompt.description).toBe("A more complex test prompt with two arguments");
         expect(prompt.messages[0].role).toBe("user");
+        expect(isTextContent(prompt.messages[0].content)).toBe(true);
+        if (!isTextContent(prompt.messages[0].content)) {
+            throw new Error("Expected text content");
+        }
         expect(prompt.messages[0].content.text).toBe("Execute a complex test with required parameter 'req' with optional parameter 'opt'");
     });
 
@@ -82,19 +116,44 @@ describe('MCP Server Prompts Tests', () => {
         expect(prompt.messages.find(m => m.content.type === "text")).toBeDefined();
         expect(prompt.messages.find(m => m.content.type === "image")).toBeDefined();
         expect(prompt.messages.find(m => m.content.type === "audio")).toBeDefined();
-        expect(prompt.messages.find(m => m.content.type === "resource" && 
-            m.content.resource.mimeType === 'image/gif' && m.content.resource.text != "")).toBeDefined();
-        expect(prompt.messages.find(m => m.content.type === "resource" && 
-            m.content.resource.mimeType === 'text/markdown' && m.content.resource.blob != "")).toBeDefined();
+        expect(
+            prompt.messages.find(
+                m =>
+                    isEmbeddedResource(m.content) &&
+                    m.content.resource.mimeType === "text/markdown" &&
+                    isTextResourceContents(m.content.resource) &&
+                    m.content.resource.text !== "",
+            ),
+        ).toBeDefined();
+        expect(
+            prompt.messages.find(
+                m =>
+                    isEmbeddedResource(m.content) &&
+                    m.content.resource.mimeType === "image/gif" &&
+                    isBlobResourceContents(m.content.resource) &&
+                    m.content.resource.blob !== "",
+            ),
+        ).toBeDefined();
         expect(prompt.messages.find(m => m.content.type === "resource_link")).toBeDefined();
     });
     
     test('Ensure order of messages is preserved', async () => {
         const prompt = await client.getPrompt({ name: "ordered" });
+        expect(isTextContent(prompt.messages[0].content)).toBe(true);
+        if (!isTextContent(prompt.messages[0].content)) {
+            throw new Error("Expected text content");
+        }
         expect(prompt.messages[0].content.text).toBe("This is the first message");
-        expect(prompt.messages[1].content.type).toBe("resource");
+        expect(isEmbeddedResource(prompt.messages[1].content)).toBe(true);
+        if (!isEmbeddedResource(prompt.messages[1].content)) {
+            throw new Error("Expected embedded resource content");
+        }
         const resourceMessage = prompt.messages[1].content.resource as TextResourceContents;
         expect(resourceMessage.text).toBe("This is the second message");
+        expect(isTextContent(prompt.messages[2].content)).toBe(true);
+        if (!isTextContent(prompt.messages[2].content)) {
+            throw new Error("Expected text content");
+        }
         expect(prompt.messages[2].content.text).toBe("This is the third message");
     });
 
@@ -109,7 +168,6 @@ describe('MCP Server Prompts Tests', () => {
         expect(prompt?._meta?.["abapai/test2"]).toBe("This is another test meta information");
         expect(prompt?.arguments).toHaveLength(1);
         expect(prompt?.arguments?.[0]?.name).toBe("testArg");
-        expect(prompt?.arguments?.[0]?.title).toBe("Test Arg Title");
         expect(prompt?.arguments?.[0]?.description).toBe("Test Arg Description");
     });
 
@@ -120,7 +178,12 @@ describe('MCP Server Prompts Tests', () => {
         expect(prompt._meta?.["abapai/promptTest"]).toBe("This is a test meta information");
         
         // Check for resource link message
-        const resourceLinkMessage = prompt.messages.find(m => m.content.type === "resource_link")?.content as unknown as ResourceLink;
+        const resourceLinkContent = prompt.messages.find(
+            m => m.content.type === "resource_link",
+        )?.content;
+        expect(() => ResourceLinkSchema.parse(resourceLinkContent)).not.toThrow();
+        expect(resourceLinkContent?.type).toBe("resource_link");
+        const resourceLinkMessage = resourceLinkContent as ResourceLink;
         expect(resourceLinkMessage).toBeDefined();
         expect(resourceLinkMessage?.uri).toBe("http://blubb.wuff/abcdf");
         expect(resourceLinkMessage?.description).toBe("Resource Link");

@@ -1,9 +1,9 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { getEndpointUrl } from "./config.js";
 
 describe('MCP Server Session Tests', () => {
-    const baseUrl = new URL("http://localhost:8000/zmcp");
     let client: Client;
     let transport: StreamableHTTPClientTransport;
 
@@ -14,7 +14,7 @@ describe('MCP Server Session Tests', () => {
         });
         const sessionServer = "/test/test_mcp_session";
         transport = new StreamableHTTPClientTransport(
-            new URL(baseUrl + sessionServer),
+            getEndpointUrl(sessionServer),
         );
         await client.connect(transport);
     });
@@ -80,7 +80,7 @@ describe('MCP Server Session Tests', () => {
 
         // Create new transport and client
         const newTransport = new StreamableHTTPClientTransport(
-            new URL(baseUrl + "/test/test_mcp_session"),
+            getEndpointUrl("/test/test_mcp_session"),
         );
         const newClient = new Client({
             name: 'test-client-2',

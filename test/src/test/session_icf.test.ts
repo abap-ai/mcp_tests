@@ -1,9 +1,9 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { CookieAwareTransport } from "./CookieAwareTransport.js";
+import { getEndpointUrl } from "./config.js";
 
 describe('ICF Server Session Tests', () => {
-    const baseUrl = new URL("http://localhost:8000/zmcp");
     let client: Client;
     let transport: CookieAwareTransport;
 
@@ -14,7 +14,7 @@ describe('ICF Server Session Tests', () => {
         });
         const sessionServer = "/test/test_icf_session";
         transport = new CookieAwareTransport(
-            new URL(baseUrl + sessionServer),
+            getEndpointUrl(sessionServer),
         );
         await client.connect(transport);
     });
@@ -88,7 +88,7 @@ describe('ICF Server Session Tests', () => {
             // Create new transport and client with clean session
             const sessionServer = "/test/test_icf_session";
             const newTransport = new CookieAwareTransport(
-                new URL(baseUrl + sessionServer)
+                getEndpointUrl(sessionServer)
             );
             const newClient = new Client({
                 name: 'test-client-2',
@@ -118,7 +118,7 @@ describe('ICF Server Session Tests', () => {
                 version: '1.0.0'
             });
             transport = new CookieAwareTransport(
-                new URL(baseUrl + "/test/test_icf_session")
+                getEndpointUrl("/test/test_icf_session")
             );
             await client.connect(transport);
         }

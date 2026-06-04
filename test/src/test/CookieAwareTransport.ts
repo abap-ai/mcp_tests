@@ -1,8 +1,6 @@
 import { StreamableHTTPClientTransport, StreamableHTTPClientTransportOptions } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import fetch, { Response, RequestInfo, RequestInit } from "node-fetch";
 
-// Create a type for the fetch function
-type FetchFn = (url: RequestInfo, init?: RequestInit) => Promise<Response>;
+type FetchFn = typeof fetch;
 
 export class CookieAwareTransport extends StreamableHTTPClientTransport {
     private cookies: string[] = [];
@@ -13,24 +11,27 @@ export class CookieAwareTransport extends StreamableHTTPClientTransport {
         super(url, opts);
 
         // Store original fetch implementation
-        this.originalFetch = (global as any).fetch || fetch;
+        if (typeof globalThis.fetch !== "function") {
+            throw new Error("Global fetch is not available in this Node runtime.");
+        }
+        this.originalFetch = globalThis.fetch.bind(globalThis);
 
         // Override fetch
-        (global as any).fetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
+        globalThis.fetch = async (url, init): Promise<Response> => {
             // Add stored cookies and session ID to request
             init = init || {};
             const headers: Record<string, string> = {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                ...(init.headers as Record<string, string> || {})
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                ...((init.headers as Record<string, string>) || {}),
             };
 
             if (this.cookies.length > 0) {
-                headers['cookie'] = this.cookies.join('; ');
+                headers.cookie = this.cookies.join("; ");
             }
 
             if (this.mcpSessionId) {
-                headers['mcp-session-id'] = this.mcpSessionId;
+                headers["mcp-session-id"] = this.mcpSessionId;
             }
 
             init.headers = headers;
@@ -60,7 +61,7 @@ export class CookieAwareTransport extends StreamableHTTPClientTransport {
         this.mcpSessionId = null;
         
         // Restore original fetch
-        (global as any).fetch = this.originalFetch;
+        globalThis.fetch = this.originalFetch;
         
         await super.close();
     }

@@ -1,8 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { getEndpointUrl } from "./config.js";
 
 describe('MCP Connection Tests', () => {
-    const baseUrl = new URL("http://localhost:8000/zmcp");
     const demoServer = "/test/test_minimal";
 
     test('should successfully connect to server', async () => {
@@ -11,7 +11,7 @@ describe('MCP Connection Tests', () => {
             version: '1.0.0'
         });
         const transport = new StreamableHTTPClientTransport(
-            new URL(baseUrl + demoServer),
+            getEndpointUrl(demoServer),
         );
         
         await expect(client.connect(transport)).resolves.not.toThrow();

@@ -1,9 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { TextResourceContents } from "@modelcontextprotocol/sdk/types.js";
+import { IconSchema } from "@modelcontextprotocol/sdk/types.js";
+import { getEndpointUrl } from "./config.js";
+import { isBlobResourceContents, isTextResourceContents } from "./contentGuards.js";
 
 describe('MCP Server Resources Tests', () => {
-    const baseUrl = new URL("http://localhost:8000/zmcp");
     let client: Client;
     let transport: StreamableHTTPClientTransport;
 
@@ -14,7 +15,7 @@ describe('MCP Server Resources Tests', () => {
         });
         const demoServer = "/test/test_full";
         transport = new StreamableHTTPClientTransport(
-            new URL(baseUrl + demoServer),
+            getEndpointUrl(demoServer),
         );
         await client.connect(transport);
     });
@@ -28,6 +29,25 @@ describe('MCP Server Resources Tests', () => {
     test('List resources should return three resources', async () => {
         const resources = (await client.listResources()).resources;
         expect(resources).toHaveLength(3);
+    });
+
+    test('List resources should include standard icons where advertised', async () => {
+        const resources = (await client.listResources()).resources;
+
+        const okResource = resources.find(r => r.name === "OK");
+        expect(okResource?.icons?.length).toBeGreaterThan(0);
+        expect(() => IconSchema.array().parse(okResource?.icons)).not.toThrow();
+        expect(typeof okResource?.icons?.[0]?.src).toBe("string");
+        expect(typeof okResource?.icons?.[0]?.mimeType).toBe("string");
+
+        const ok2Resource = resources.find(r => r.name === "OK2");
+        expect(ok2Resource?.icons?.length).toBeGreaterThan(0);
+        expect(() => IconSchema.array().parse(ok2Resource?.icons)).not.toThrow();
+        expect(typeof ok2Resource?.icons?.[0]?.src).toBe("string");
+        expect(typeof ok2Resource?.icons?.[0]?.mimeType).toBe("string");
+
+        const textResource = resources.find(r => r.name === "TextFile");
+        expect(textResource?.icons).toBeUndefined();
     });
 
     test('List resources should include specific resources', async () => {
@@ -59,16 +79,22 @@ describe('MCP Server Resources Tests', () => {
         const resource = (await client.readResource({ uri: "file://sap/okay.gif" }));
         expect(resource.contents).toHaveLength(1);
         expect(resource.contents[0].mimeType).toBe("image/gif");
+        expect(isBlobResourceContents(resource.contents[0])).toBe(true);
+        if (!isBlobResourceContents(resource.contents[0])) {
+            throw new Error("Expected blob resource");
+        }
         expect(resource.contents[0].blob).toBeDefined();
-        expect(resource.contents[0].text).toBeUndefined();
     });
 
     test('Should read json resource as text', async () => {
         const resource = await client.readResource({ uri: "file://sap/text.json" });
         expect(resource.contents).toHaveLength(1);
         expect(resource.contents[0].mimeType).toBe("text/json");
+        expect(isTextResourceContents(resource.contents[0])).toBe(true);
+        if (!isTextResourceContents(resource.contents[0])) {
+            throw new Error("Expected text resource");
+        }
         expect(resource.contents[0].text).toBe('{ "key": "value" }');
-        expect(resource.contents[0].blob).toBeUndefined();
     });
 
     test('Should fail when requesting non-existent resource', async () => {

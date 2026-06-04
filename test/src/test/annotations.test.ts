@@ -1,8 +1,14 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { ContentBlock } from "@modelcontextprotocol/sdk/types.js";
+import {
+    isBlobResourceContents,
+    isEmbeddedResource,
+    isTextResourceContents,
+} from "./contentGuards.js";
+import { getEndpointUrl } from "./config.js";
 
 describe('MCP Server Annotations Tests', () => {
-    const baseUrl = new URL("http://localhost:8000/zmcp");
     let client: Client;
     let transport: StreamableHTTPClientTransport;
 
@@ -13,7 +19,7 @@ describe('MCP Server Annotations Tests', () => {
         });
         const demoServer = "/test/test_annotations";
         transport = new StreamableHTTPClientTransport(
-            new URL(baseUrl + demoServer),
+            getEndpointUrl(demoServer),
         );
         await client.connect(transport);
     });
@@ -61,7 +67,7 @@ describe('MCP Server Annotations Tests', () => {
     test('Tool call response should include content with annotations and different resource types', async () => {
         const response = await client.callTool({ name: "AllHints" });
         
-        const contentArray = Array.isArray(response.content) ? response.content : [];
+        const contentArray = Array.isArray(response.content) ? (response.content as ContentBlock[]) : [];
         expect(contentArray.length).toBeGreaterThan(0);
 
         const textContent = contentArray.find(c => c.type === "text");
@@ -79,8 +85,10 @@ describe('MCP Server Annotations Tests', () => {
         expect(imageContent?.annotations?.priority).toBe(0.1);
 
         // Check text resource type
-        const textResource = contentArray.find(c => 
-            c.type === "resource" && c.resource && 'text' in c.resource
+        const textResource = contentArray.find(
+            c =>
+                isEmbeddedResource(c) &&
+                isTextResourceContents(c.resource),
         );
         expect(textResource).toBeDefined();
         expect(textResource?.annotations).toBeDefined();
@@ -89,11 +97,18 @@ describe('MCP Server Annotations Tests', () => {
         expect(textResource?.annotations?.lastModified).toBeDefined();
         expect(typeof textResource?.annotations?.lastModified).toBe("string");
         // Check if lastModified is a valid ISO 8601 date string
-        expect(() => new Date(textResource?.annotations?.lastModified).toISOString()).not.toThrow();
+        const textResourceLastModified = textResource?.annotations?.lastModified;
+        expect(textResourceLastModified).toBeDefined();
+        if (textResourceLastModified === undefined) {
+            throw new Error("Expected lastModified annotation");
+        }
+        expect(() => new Date(textResourceLastModified).toISOString()).not.toThrow();
 
         // Check blob resource type
-        const blobResource = contentArray.find(c => 
-            c.type === "resource" && c.resource && ('blob' in c.resource)
+        const blobResource = contentArray.find(
+            c =>
+                isEmbeddedResource(c) &&
+                isBlobResourceContents(c.resource),
         );
         expect(blobResource).toBeDefined();
         expect(blobResource?.annotations).toBeDefined();

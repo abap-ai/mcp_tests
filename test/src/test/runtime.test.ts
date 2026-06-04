@@ -2,6 +2,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { CookieAwareTransport } from "./CookieAwareTransport.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { getEndpointUrl } from "./config.js";
+import { isBlobResourceContents } from "./contentGuards.js";
 
 async function measureExecutionTime<T>(fn: () => Promise<T>): Promise<[T, number]> {
     const startTime = performance.now();
@@ -11,7 +13,6 @@ async function measureExecutionTime<T>(fn: () => Promise<T>): Promise<[T, number
 }
 
 describe('MCP Server Runtime Performance Tests', () => {
-    const baseUrl = new URL("http://localhost:8000/zmcp");
     let client: Client;
     let transport: StreamableHTTPClientTransport;
 
@@ -22,7 +23,7 @@ describe('MCP Server Runtime Performance Tests', () => {
         });
         const demoServer = "/test/test_full";
         transport = new StreamableHTTPClientTransport(
-            new URL(baseUrl + demoServer),
+            getEndpointUrl(demoServer),
         );
         await client.connect(transport);
     });
@@ -58,18 +59,18 @@ describe('MCP Server Runtime Performance Tests', () => {
     });
 
     test('should measure execution time for client initialization', async () => {
-        const [_, executionTime] = await measureExecutionTime(async () => {
+        const executionTime = (await measureExecutionTime(async () => {
             const testClient = new Client({
                 name: 'test-client',
                 version: '1.0.0'
             });
             const testTransport = new StreamableHTTPClientTransport(
-                new URL(baseUrl + "/test/test_full"),
+                getEndpointUrl("/test/test_full"),
             );
             await testClient.connect(testTransport);
             await testClient.close();
             return true;
-        });
+        }))[1];
 
         console.log(`Client initialization time: ${executionTime}ms`);
         expect(executionTime).toBeLessThan(1000); // Allow 1s for initial connection
@@ -91,6 +92,10 @@ describe('MCP Server Runtime Performance Tests', () => {
         );
 
         expect(resource.contents[0].mimeType).toBe("image/gif");
+        expect(isBlobResourceContents(resource.contents[0])).toBe(true);
+        if (!isBlobResourceContents(resource.contents[0])) {
+            throw new Error("Expected blob resource");
+        }
         expect(resource.contents[0].blob).toBeDefined();
         
         console.log(`Get gif resource execution time: ${executionTime}ms`);
@@ -102,7 +107,7 @@ describe('MCP Server Runtime Performance Tests', () => {
             client.listTools()
         );
 
-        expect(result.tools).toHaveLength(4);
+        expect(result.tools).toHaveLength(6);
         console.log(`List tools execution time: ${executionTime}ms`);
         expect(executionTime).toBeLessThan(1000); // Should complete pretty fast
     });
@@ -153,7 +158,7 @@ describe('MCP Server Runtime Performance Tests', () => {
     test('should measure execution time for MCP Session operations', async () => {
         const sessionServer = "/test/test_mcp_session";
         const sessionTransport = new StreamableHTTPClientTransport(
-            new URL(baseUrl + sessionServer),
+            getEndpointUrl(sessionServer),
         );
         const sessionClient = new Client({
             name: 'test-client-session',
@@ -195,7 +200,7 @@ describe('MCP Server Runtime Performance Tests', () => {
     test('should measure execution time for ICF Session operations', async () => {
         const sessionServer = "/test/test_icf_session";
         const sessionTransport = new CookieAwareTransport(
-            new URL(baseUrl + sessionServer),
+            getEndpointUrl(sessionServer),
         );
         const sessionClient = new Client({
             name: 'test-client-session',
