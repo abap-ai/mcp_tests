@@ -28,5 +28,11 @@
     "area": "test",
     "server": "test_minimal",
     "class": "ZCL_MCP_TEST_MINIMAL"
+  },
+  {
+    "client": "001",
+    "area": "test",
+    "server": "test_v2",
+    "class": "ZCL_MCP_TEST_V2"
   }
 ]
