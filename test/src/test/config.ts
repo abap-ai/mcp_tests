@@ -1,5 +1,5 @@
 export function getMcpBaseUrl(): URL {
-    return new URL(process.env.MCP_BASE_URL ?? "http://localhost:8000/zmcp");
+    return new URL(process.env.MCP_BASE_URL ?? "http://192.168.56.101:8000/zmcp");
 }
 
 export function getEndpointUrl(path: string): URL {
